@@ -61,7 +61,7 @@ export default function Profile() {
 
                 <View style={styles.statsContainer}>
                     <View style={styles.statsBox}>
-                        <Text style={[styles.text, { fontSize: 18 }]}>{userData.city}</Text>
+                        <Text style={[styles.text, { fontSize: 18 }]}>{'Chennai'}</Text>
                         <Text style={[styles.text, styles.subText]}>Location</Text>
                     </View>
                     <View style={[styles.statsBox, { borderColor: "#DFD8C8", borderLeftWidth: 1, }]}>

@@ -1,6 +1,6 @@
 // App.js or your screen component file
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, Button, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Dimensions, Button, Alert, Text, ScrollView, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import axios from 'axios';
 
@@ -33,14 +33,14 @@ const RouteScreen = () => {
   const fetchRoute = async (start, end) => {
     setLoading(true);
     const url = `https://api.tomtom.com/routing/1/calculateRoute/${start.latitude},${start.longitude}:${end.latitude},${end.longitude}/json?&key=${YOUR_TOMTOM_API_KEY}`;
-  
+
     try {
       const response = await axios.get(url);
       const routeData = response.data.routes[0].legs.flatMap(leg => leg.points);
       setRouteCoordinates(routeData);
       // After fetching the route, find charging stations along it
-      
-      findChargingStations2(routeData)
+
+      findChargingStations(routeData)
 
     } catch (error) {
       console.error('Failed to fetch route:', error);
@@ -48,7 +48,7 @@ const RouteScreen = () => {
     } finally {
       setLoading(false);
     }
-    
+
   };
   const getPointsEvery250Km = (routeCoordinates) => {
     // Placeholder: Returns every Nth point for simplicity
@@ -56,17 +56,17 @@ const RouteScreen = () => {
     const POINTS_INTERVAL = 5; // Simplified assumption
     return routeCoordinates.filter((_, index) => index % POINTS_INTERVAL === 0);
   };
-  
+
   const findChargingStations = async (routeCoordinates) => {
     if (routeCoordinates.length === 0) return;
-  
+
     // Simplification: Find a midpoint for demonstration purposes
     const midpointIndex = Math.floor(routeCoordinates.length / 2);
     const midpoint = routeCoordinates[midpointIndex];
-  
+
     const searchRadius = 5000; // Search within 50 km radius
     const url = `https://api.tomtom.com/search/2/search/charging_station.json?lat=${midpoint.latitude}&lon=${midpoint.longitude}&radius=${searchRadius}&key=${YOUR_TOMTOM_API_KEY}`;
-  
+
     try {
       const response = await axios.get(url);
       const stations = response.data.results.map(station => ({
@@ -81,36 +81,10 @@ const RouteScreen = () => {
     }
   };
 
-  const findChargingStations2 = async (routeCoordinates) => {
-    const segmentPoints = getPointsEvery250Km(routeCoordinates);
-    let allStations = [];
-  
-    for (const point of segmentPoints) {
-      const searchRadius = 50000; // 50 km radius
-      const url = `https://api.tomtom.com/search/2/search/charging_station.json?lat=${point.latitude}&lon=${point.longitude}&radius=${searchRadius}&key=${YOUR_TOMTOM_API_KEY}`;
-  
-      try {
-        const response = await axios.get(url);
-        const stations = response.data.results.map(station => ({
-          id: station.id,
-          name: station.poi.name,
-          position: station.position,
-        }));
-        allStations = allStations.concat(stations);
-      } catch (error) {
-        console.error('Failed to find charging stations:', error);
-        // Optionally, handle the error, e.g., by breaking the loop or trying a fallback strategy
-        break;
-      }
-    }
-  
-    setChargingStations(allStations);
-  };
-  
-  
+
   return (
     <View style={styles.container}>
-        
+
       <MapView style={styles.map} onPress={handleMapPress}>
         {startPoint && <Marker coordinate={startPoint} title="Start" />}
         {endPoint && <Marker coordinate={endPoint} title="End" />}

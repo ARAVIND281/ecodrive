@@ -10,6 +10,7 @@ import {
     Dimensions,
     ImageBackground,
     FlatList,
+    Alert,
     TouchableOpacity
 } from 'react-native'
 import { BottomSheetModal, BottomSheetModalProvider, } from "@gorhom/bottom-sheet";
@@ -29,6 +30,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Stars from 'react-native-stars';
 import Modal from "react-native-modal";
 import { GiftedChat } from 'react-native-gifted-chat'
+import axios from 'axios';
 
 const YOUR_TOMTOM_API_KEY = 'T166rLZODnNrHuvhX9CswHERqmjePmgH';
 
@@ -43,7 +45,6 @@ const fetchEVChargingStations = async (latitude, longitude) => {
     try {
         const response = await fetch(url);
         const json = await response.json();
-        console.log("API Response:", json);
         return json.results;
     } catch (error) {
         console.error("Fetch error:", error);
@@ -51,27 +52,6 @@ const fetchEVChargingStations = async (latitude, longitude) => {
     }
 };
 
-const fetchRoute = async (start, end) => {
-    console.log(start, end);
-    setLoading(true);
-    const url = `https://api.tomtom.com/routing/1/calculateRoute/${start.latitude},${start.longitude}:${end.latitude},${end.longitude}/json?&key=${YOUR_TOMTOM_API_KEY}`;
-
-    try {
-        const response = await axios.get(url);
-        const routeData = response.data.routes[0].legs.flatMap(leg => leg.points);
-        setRouteCoordinates(routeData);
-        // After fetching the route, find charging stations along it
-        findChargingStations(routeData)
-        findChargingStations2(routeData)
-
-    } catch (error) {
-        console.error('Failed to fetch route:', error);
-        Alert.alert('Error', 'Failed to fetch the route. Please try again.');
-    } finally {
-        setLoading(false);
-    }
-
-};
 
 
 
@@ -100,6 +80,41 @@ const Explore = ({ navigation }) => {
 
         fetchData();
     }, []);
+
+    const onPressMapIcon = async (startLat, startLon, endLat, endLon) => {
+        const startCoord = { latitude: startLat, longitude: startLon };
+        const endCoord = { latitude: endLat, longitude: endLon };
+        const routeData = fetchRoute(startCoord, endCoord);
+
+        if (routeData) {
+            setRoute(routeData); // Assuming setRoute updates the state with the fetched route
+            setViewCode(2); // Transition to view code 2 to display the route
+            console.log(viewCode);
+        } else {
+            Alert.alert("Error", "Unable to fetch the route. Please try again.");
+        }
+
+    };
+
+
+    const fetchRoute = async (start, end) => {
+        const url = `https://api.tomtom.com/routing/1/calculateRoute/${start.latitude},${start.longitude}:${end.latitude},${end.longitude}/json?key=${YOUR_TOMTOM_API_KEY}`;
+        console.log(url);
+
+        try {
+            const response = await fetch(url);
+            const json = await response.json(); // Correctly await the parsing of the JSON response body
+            const points = json.routes[0].legs[0].points.map(p => ({
+                latitude: p.latitude,
+                longitude: p.longitude,
+            }));
+            return points;
+        } catch (error) {
+            console.error('Failed to fetch route:', error);
+            return null; // Return null to indicate failure
+        }
+    };
+
 
     useEffect(() => {
         (async () => {
@@ -134,19 +149,10 @@ const Explore = ({ navigation }) => {
             <TouchableOpacity>
                 <ListItem
                     onPress={() => {
-                        var start = { lat: latitude, lng: longitude }; // Amsterdam
-                        var end = { lat: station.position.lat, lng: station.position.lat }; // Paris
-
-                        fetchRoute(start, end).then(setRoute);
-                        start = { lat: 52.379189, lng: 4.899431 }; // Amsterdam
-                        end = { lat: 48.8566, lng: 2.3522 }; // Paris
-
-                        fetchRoute(start, end).then(setRoute);
-
                         setSelectedStations(station)
-                        setViewCode(1)
+                        navigation.navigate('EvDetails', { station: station })
                     }}
-                    ViewComponent={View} // Only if no expo
+                    ViewComponent={View}
                     style={{
                         width: "100%"
                     }}
@@ -167,9 +173,9 @@ const Explore = ({ navigation }) => {
         );
     }
 
-    if (viewCode == 0 && stations.length > 0) {
+    if (stations.length > 0) {
         handlePresentModal()
-        
+
         return (
 
             <SafeAreaView style={{ flex: 1 }}>
@@ -240,156 +246,7 @@ const Explore = ({ navigation }) => {
 
             </SafeAreaView>
         );
-    } else if (viewCode == 1) {
-        
 
-
-        return (
-            <View style={styles.container}>
-                <ImageBackground
-                    source={require("../images/unnamed.jpg")}
-                    style={styles.map}
-                >
-                    <Text style={[styles.textDash, { marginTop: "15%" }]}>{selectedStations.poi.name}</Text>
-                </ImageBackground>
-
-                {/* Box just below EV CHARGING heading */}
-                <View style={styles.box} >
-                    <View style={[styles.box, { backgroundColor: "red", alignSelf: "left", width: "85%" }]}>
-                        <View style={styles.icon}>
-                            <Ionicons style={styles.icon1} name="fast-food-outline" size={24} color="black" />
-                            <View style={styles.text}>
-                                <Text style={styles.head}>PLACES TO CHILL:</Text>
-                                <Text style={styles.head1} >KFC</Text>
-                            </View>
-
-                            <View style={[styles.box, { backgroundColor: "black", alignSelf: "left", width: "50%" }]}>
-                                <MapView style={{ height: '100%', width: '100%' }}
-                                    initialRegion={{
-                                        latitude: selectedStations.position.lat,
-                                        longitude: selectedStations.position.lon,
-                                        latitudeDelta: 0.0922,
-                                        longitudeDelta: 0.0421,
-                                    }}
-                                >
-                                    <Marker
-                                        coordinate={{
-                                            latitude: selectedStations.position.lat,
-                                            longitude: selectedStations.position.lon,
-                                        }}
-                                    />
-                                </MapView>
-                                <TouchableOpacity style={{
-                                    marginTop: -34,
-                                    alignSelf: 'flex-start'
-                                }}>
-                                    <FontAwesome5 name="directions" size={34} color="black" /></TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                <ScrollView
-                    style={{ marginTop: 50 }}
-                    showsHorizontalScrollIndicator={false}
-                    horizontal
-                >
-                    <Cards
-                        onPress={() => this.props.navigation.navigate('Detail')}
-                        icon="power-plug"
-                        title="TOTAL NO. OF PORTS"
-                        bg="red"
-                        number="4"
-                        type="entypo"
-                    />
-                    <Cards
-                        icon="event-available"
-                        title="AVAILABLE"
-                        bg="#FFF"
-                        number="2"
-                        type="material"
-                    />
-                    <Cards
-                        icon="clock"
-                        title="OCCUPIED"
-                        bg="#FFF"
-                        number="2"
-                        type="font-awesome-5"
-                    />
-
-                    <Cards
-                        icon="times-circle"
-                        title="NON FUNCTIONAL"
-                        bg="#FFF"
-                        number="0"
-                        type="font-awesome-5"
-                    />
-                </ScrollView>
-                <View style={{ alignItems: 'center' }}>
-                    <Stars
-                        default={2.5}
-                        count={5}
-                        half={true}
-                        starSize={30} /* Adjust the size as needed */
-                        fullStar={<Icon name={'star'} style={[styles.myStarStyle, { fontSize: 30 }]} />}
-                        emptyStar={<Icon name={'star-outline'} style={[styles.myStarStyle, styles.myEmptyStarStyle, { fontSize: 30 }]} />}
-                        halfStar={<Icon name={'star-half'} style={[styles.myStarStyle, { fontSize: 30 }]} />}
-                    />
-                </View>
-                <View style={{ marginBottom: 34 }}>
-                    {/* TouchableOpacity button */}
-                    <TouchableOpacity
-                        onPress={() => {
-                            // Handle onPress event here
-                            console.log("Review button pressed");
-                        }}
-                        style={styles.buttonContainer}
-                    >
-                        <Text style={styles.buttonText}>REVIEW</Text>
-                    </TouchableOpacity>
-
-
-                </View>
-                {/* <Modal isVisible={true} style={{ backgroundColor: '#fff', height: Dimensions.get('window').height, width: Dimensions.get('window').width }}>
-                    <View style={{ flex: 1 }}>
-                        <GiftedChat
-                            messages={messages}
-                            onSend={messages => onSend(messages)}
-                            user={{
-                                _id: 1,
-                            }}
-                        />
-                    </View>
-                </Modal> */}
-            </View>
-        )
-
-    } else if (viewCode == 2) {
-        return (
-            <View style={{
-                flex: 1,
-                backgroundColor: '#fff',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}>
-                <MapView
-                    style={{
-                        width: Dimensions.get('window').width,
-                        height: Dimensions.get('window').height,
-                    }}
-                    initialRegion={{
-                        latitude: 52.379189,
-                        longitude: 4.899431,
-                        latitudeDelta: 4,
-                        longitudeDelta: 4,
-                    }}
-                >
-                    {route.length > 0 && (
-                        <Polyline coordinates={route} strokeWidth={5} strokeColor="red" />
-                    )}
-                </MapView>
-            </View>
-        )
     }
 
 
